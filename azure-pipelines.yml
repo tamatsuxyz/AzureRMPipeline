@@ -9,17 +9,41 @@ trigger:
 pool:
   name: azureAgentPool
 
+variables:
+  azureSubscription: 'Azure Internal - Sponsorship'
+  resourcegroup: TailwindTraders
+  location: japaneast
+  ImageName: website
+
 steps:
-- task: AzureResourceManagerTemplateDeployment@3
+- task: AzureResourceGroupDeployment@2
+  displayName: Azure Deployment
   inputs:
-    deploymentScope: 'Resource Group'
-    azureResourceManagerConnection: 'Azure Internal - Sponsorship'
-    subscriptionId: '1ca3db5a-f396-4795-9927-e2ecd76f800d'
-    action: 'Create Or Update Resource Group'
-    resourceGroupName: 'AzureRMPipeline'
-    location: 'Japan East'
-    templateLocation: 'URL of the file'
-    csmFileLink: 'https://raw.githubusercontent.com/tamatsuxyz/AzureRMPipeline/main/CreateWebApp/azuredeploy.json'
-    overrideParameters: '-projectName adodeploy00'
-    deploymentMode: 'Incremental'
-    deploymentName: 'DeployPipelineTemplate'
+    azureSubscription: $(azureSubscription)
+    resourceGroupName: $(resourcegroup)
+    location: $(location)
+    csmFile: Deploy/deployment.json
+
+- task: keesschollaart.arm-outputs.arm-outputs.ARM Outputs@5
+  displayName: ARM Outputs
+  inputs:
+    ConnectedServiceNameARM: $(azureSubscription)
+    resourceGroupName: $(resourcegroup)
+
+- task: Docker@1
+  displayName: 'Build an image'
+  inputs:
+    azureSubscriptionEndpoint: $(azureSubscription)
+    azureContainerRegistry: $(acr).azurecr.io
+    dockerFile: Source/Tailwind.Traders.Web/Dockerfile
+    arguments: '-t $(acr).azurecr.io/$(ImageName):$(Build.BuildId)'
+    imageName: '$(ImageName):$(Build.BuildId)'
+    includeLatestTag: true
+
+- task: Docker@1
+  displayName: 'Push Image'
+  inputs:
+    azureSubscriptionEndpoint: $(azureSubscription)
+    azureContainerRegistry: '$(acr).azurecr.io'
+    command: 'Push an image'
+    imageName: '$(ImageName):$(Build.BuildId)'
